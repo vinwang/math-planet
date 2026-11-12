@@ -1,10 +1,20 @@
 // Trophies (id036).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TROPHIES, TROPHY, SERIES, CATS, trophyMetrics, evaluate, seriesView, earnedCount } from '../app/js/trophies.js';
+import { TROPHIES, TROPHY, SERIES, CATS, RANK_NAME, trophyMetrics, evaluate, seriesView, earnedCount } from '../app/js/trophies.js';
 import { emptyProgress, masterWithAncestors } from '../app/js/session.js';
 import { emptyStats } from '../app/js/growth.js';
 import { SKILLS } from '../app/js/skills.js';
+
+test('trophy labels use Chinese and retain their earned ids', () => {
+  for (const series of SERIES) assert.doesNotMatch(series.title, /[\u3040-\u30ff]/u, series.key);
+  for (const t of TROPHIES) {
+    assert.doesNotMatch(`${t.name}${t.desc}`, /[\u3040-\u30ff]/u, t.id);
+  }
+  assert.equal(RANK_NAME.rainbow, '彩虹');
+  assert.equal(TROPHY['dopa-8'].name, '1亿星能');
+  assert.equal(TROPHY['secret-extraClean'].name, '加赛全对');
+});
 
 test('the catalogue: more than 100 trophies, unique ids, rising steps, known categories', () => {
   assert.ok(TROPHIES.length >= 100, `${TROPHIES.length}`);

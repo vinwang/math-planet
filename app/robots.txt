@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://dopa-drill.tanosix.com/sitemap.xml

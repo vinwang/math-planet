@@ -4,6 +4,13 @@ import assert from 'node:assert/strict';
 import { CATS, ITEMS, ITEM, pickLook, unlockedIn, isUnlocked, defaultEquip, variant } from '../app/js/unlocks.js';
 import { TROPHY } from '../app/js/trophies.js';
 
+test('collection labels use Chinese while item ids remain compatible', () => {
+  for (const c of CATS) assert.doesNotMatch(c.name, /[\u3040-\u30ff]/u, c.key);
+  for (const it of ITEMS) assert.doesNotMatch(it.name, /[\u3040-\u30ff]/u, it.id);
+  assert.equal(ITEM['mark:hanamaru'].name, '小红花');
+  assert.equal(ITEM['costume:hachimaki'].name, '运动头带');
+});
+
 test('catalogue: one base item per category, rewards point at real trophies, no trophy gives two', () => {
   for (const c of CATS) assert.equal(ITEMS.filter((it) => it.cat === c.key && it.base).length, 1, c.key);
   const seen = new Set();

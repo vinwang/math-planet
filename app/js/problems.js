@@ -1,3 +1,4 @@
+import { getLanguage } from './i18n.js';
 // Problem generation and layouts. Every problem is a small grid of cells
 // (digits, operators, lines) plus an ordered list of input steps; each step
 // is one digit typed into one cell. Layout families:
@@ -15,13 +16,13 @@ export function makeRng(seed) {
   };
 }
 
-const PLACE = ['一の位', '十の位', '百の位', '千の位', '万の位', '十万の位'];
-const DEC_PLACE = ['小数第一位', '小数第二位', '小数第三位'];
+const PLACE = ['个位', '十位', '百位', '千位', '万位', '十万位'];
+const DEC_PLACE = ['十分位', '百分位', '千分位'];
 const digits = (n) => String(n).split('').map(Number);
 const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
 const lcm = (a, b) => (a / gcd(a, b)) * b;
 // Multiples of d up to the first one above n (hint for "how many d in n").
-const table = (d, n) => { const out = []; for (let k = 1; k <= 9; k++) { out.push(d * k); if (d * k > n) break; } return `${d}のだん ${out.join(' ')}`; };
+const table = (d, n) => { const out = []; for (let k = 1; k <= 9; k++) { out.push(d * k); if (d * k > n) break; } return `${d}的乘法口诀：${out.join(' ')}`; };
 // Decimal string for an integer scaled by 10^p (1234, 2 -> "12.34").
 const decStr = (n, p) => { if (!p) return String(n); const s = String(n).padStart(p + 1, '0'); return `${s.slice(0, -p)}.${s.slice(-p)}`; };
 
@@ -62,7 +63,7 @@ function buildAdd(a, b, pa = 0, pb = 0) {
     const carryIn = carry;
     carry = s >= 10 ? 1 : 0;
     const terms = [ad[i], bd[i]].filter((x, k) => x !== undefined && (k === 0 ? shown(as, pa, as.length - 1 - i) : shown(bs, pb, bs.length - 1 - i)));
-    const help = { ids: [`a${c}`, `b${c}`, ...(carryIn ? [`k${c}`] : [])], text: terms.length ? `${terms.join(' ＋ ')}${carryIn ? ' ＋ 1' : ''}` : 'くりあがりの 1' };
+    const help = { ids: [`a${c}`, `b${c}`, ...(carryIn ? [`k${c}`] : [])], text: terms.length ? `${terms.join(' ＋ ')}${carryIn ? ' ＋ 1' : ''}` : '进位的 1' };
     const digit = ss[ss.length - 1 - i];
     cells.push({ id: `s${c}`, r: 3, c, text: digit, kind: 'input' });
     const after = [];
@@ -70,7 +71,7 @@ function buildAdd(a, b, pa = 0, pb = 0) {
     steps.push({ cell: `s${c}`, digit, label: placeLabel(i, P), after, carryFrom: after.length ? c : null, help });
   }
   const text = `${decStr(a, pa)} + ${decStr(b, pb)}`;
-  return { kind: 'add', a, b, answer: decStr(sum, P), text, title: P ? '小数のたしざん' : 'たしざん', rows: 4, cols, cells, lines: [{ r: 2, c0: 0, c1: cols - 1 }], steps, bracket: null };
+  return { kind: 'add', a, b, answer: decStr(sum, P), text, title: P ? '小数加法' : '加法', rows: 4, cols, cells, lines: [{ r: 2, c0: 0, c1: cols - 1 }], steps, bracket: null };
 }
 
 function buildSub(a, b, pa = 0, pb = 0) {
@@ -106,7 +107,7 @@ function buildSub(a, b, pa = 0, pb = 0) {
   }
   for (let c = 1; c < cols; c++) cells.push({ id: `m${c}`, r: 0, c, text: '', kind: 'mark', small: true });
   const text = `${decStr(a, pa)} − ${decStr(b, pb)}`;
-  return { kind: 'sub', a, b, answer: decStr(res, P), text, title: P ? '小数のひきざん' : 'ひきざん', rows: 4, cols, cells, lines: [{ r: 2, c0: 0, c1: cols - 1 }], steps, bracket: null };
+  return { kind: 'sub', a, b, answer: decStr(res, P), text, title: P ? '小数减法' : '减法', rows: 4, cols, cells, lines: [{ r: 2, c0: 0, c1: cols - 1 }], steps, bracket: null };
 }
 
 // Digits of a scaled decimal, with at least one digit before the point.
@@ -139,9 +140,9 @@ function buildMul(a, b, pa = 0, pb = 0) {
       const digit = part[part.length - 1 - i];
       cells.push({ id: `${tag}${c}`, r: row, c, text: digit, kind: 'input' });
       const x = ad[i];
-      const help = x !== undefined ? { ids: [`a${c + shift}`, `b${cols - 1 - shift}`], text: `${x} × ${factor}${carry ? ` ＋ ${carry}` : ''}` } : { ids: [], text: `くりあがりの ${carry}` };
+      const help = x !== undefined ? { ids: [`a${c + shift}`, `b${cols - 1 - shift}`], text: `${x} × ${factor}${carry ? ` ＋ ${carry}` : ''}` } : { ids: [], text: `进位的 ${carry}` };
       carry = x !== undefined ? Math.floor((x * factor + carry) / 10) : 0;
-      steps.push({ cell: `${tag}${c}`, digit, label: `${factor}をかける`, after: [], help });
+      steps.push({ cell: `${tag}${c}`, digit, label: `乘 ${factor}`, after: [], help });
     }
   };
   if (bs.length === 1) {
@@ -159,14 +160,14 @@ function buildMul(a, b, pa = 0, pb = 0) {
       cells.push({ id: `s${c}`, r: 5, c, text: digit, kind: 'input' });
       const help = { ids: [`p${c}`, `q${c}`], text: `${x}${i ? ` ＋ ${y}` : ''}${carry ? ` ＋ ${carry}` : ''}` };
       carry = Math.floor((x + y + carry) / 10);
-      steps.push({ cell: `s${c}`, digit, label: `たす（${PLACE[i]}）`, after: [], help });
+      steps.push({ cell: `s${c}`, digit, label: `相加（${PLACE[i]}）`, after: [], help });
     }
   }
   const P = pa + pb;
   const lastRow = bs.length === 1 ? 3 : 5;
   if (P) { cells.push({ id: 'dotp', r: lastRow, c: cols - 1 - P, text: '.', kind: 'auto' }); steps[steps.length - 1].after.push('dotp'); }
   const text = `${decStr(a, pa)} × ${decStr(b, pb)}`;
-  return { kind: 'mul', a, b, answer: decStr(prod, P), text, title: P ? '小数のかけざん' : 'かけざん', rows: lastRow + 1, cols, cells, lines, steps, bracket: null };
+  return { kind: 'mul', a, b, answer: decStr(prod, P), text, title: P ? '小数乘法' : '乘法', rows: lastRow + 1, cols, cells, lines, steps, bracket: null };
 }
 
 // ================================================================ long division
@@ -199,7 +200,7 @@ function buildDiv(D, d) {
     const qid = `q${col}`;
     cells.push({ id: qid, r: 0, c: col, text: String(qd), kind: 'input' });
     const last = col === cols - 1;
-    const qStep = { cell: qid, digit: String(qd), label: `商の${PLACE[cols - 1 - col]}`, hint: `${cur}の中に${d}はいくつ`, after: [], help: { ids: divIds, text: table(d, cur) } };
+    const qStep = { cell: qid, digit: String(qd), label: `商的${PLACE[cols - 1 - col]}`, hint: `${cur}里面有几个${d}？`, after: [], help: { ids: divIds, text: table(d, cur) } };
     steps.push(qStep);
     let r = cur;
     if (qd > 0) {
@@ -223,7 +224,7 @@ function buildDiv(D, d) {
           const c = col - (rs.length - 1 - i);
           const id = `r${rowP}_${c}`;
           cells.push({ id, r: rowP, c, text: rs[i], kind: 'input' });
-          steps.push({ cell: id, digit: rs[i], label: 'ひいた のこり', hint: `${cur} − ${m}`, after: [], help: { ids: mids, text: `${cur} − ${m}` } });
+          steps.push({ cell: id, digit: rs[i], label: '相减后剩下的数', hint: `${cur} − ${m}`, after: [], help: { ids: mids, text: `${cur} − ${m}` } });
         }
       }
     }
@@ -238,15 +239,15 @@ function buildDiv(D, d) {
   }
   const row = rowP;
   const rows = row + 1;
-  const answer = rem ? `${q} あまり ${rem}` : String(q);
+  const answer = rem ? `${q} 余 ${rem}` : String(q);
   return {
-    kind: 'div', a: D, b: d, answer, text: `${D} ÷ ${d}`, title: 'わりざん', rows, cols, cells, lines, steps,
+    kind: 'div', a: D, b: d, answer, text: `${D} ÷ ${d}`, title: '除法', rows, cols, cells, lines, steps,
     bracket: { r: 1, c0: off, c1: cols - 1 }, rem,
   };
 }
 
 // ================================================================ horizontal expressions
-// tokens: { n: '12' } given number, { op: '＋' }, { w: 'あまり' } word,
+// tokens: { n: '12' } given number, { op: '＋' }, { w: '余' } word,
 // { ans: '12.5' } answer (digits typed left to right, point auto),
 // { f: [n, d, whole?] } given fraction, { fa: [n, d, whole?] } answer fraction,
 // { br: true } line break.
@@ -275,7 +276,7 @@ function buildH(tokens, meta) {
         if (ch === '.') { cells.push({ id: id('dot'), r, c: c - 1, ...span, text: '.', kind: 'dot' }); continue; }
         const cid = id('x');
         cells.push({ id: cid, r, c, ...span, text: ch, kind: 'input' });
-        steps.push({ cell: cid, digit: ch, label: t.label || 'こたえ', after: [], help: meta.help ? { ids: [...ansIds], text: meta.help } : null });
+        steps.push({ cell: cid, digit: ch, label: t.label || '答案', after: [], help: meta.help ? { ids: [...ansIds], text: meta.help } : null });
         c += 1;
       }
     } else if (t.f || t.fa) {
@@ -284,7 +285,7 @@ function buildH(tokens, meta) {
       if (whole) {
         const ws = String(whole);
         if (given) { cells.push({ id: id('w'), r, c, cs: ws.length, ...span, text: ws, kind: 'given' }); c += ws.length; } else {
-          for (const ch of ws) { const cid = id('x'); cells.push({ id: cid, r, c, ...span, text: ch, kind: 'input' }); steps.push({ cell: cid, digit: ch, label: '整数の部分', after: [], help: meta.help ? { ids: [], text: meta.help } : null }); c += 1; }
+          for (const ch of ws) { const cid = id('x'); cells.push({ id: cid, r, c, ...span, text: ch, kind: 'input' }); steps.push({ cell: cid, digit: ch, label: '整数部分', after: [], help: meta.help ? { ids: [], text: meta.help } : null }); c += 1; }
         }
       }
       const ns = String(n); const dsx = String(d);
@@ -319,7 +320,7 @@ const reduce = (n, d) => { const g = gcd(n, d); return [n / g, d / g]; };
 // Fraction answer token, as a mixed number when requested.
 function fracAns(n, d, mixed) {
   [n, d] = reduce(n, d);
-  if (mixed && n > d) return { fa: [n % d, d, Math.floor(n / d)], text: `${Math.floor(n / d)}と${n % d}/${d}` };
+  if (mixed && n > d) return { fa: [n % d, d, Math.floor(n / d)], text: `${Math.floor(n / d)}又${n % d}/${d}` };
   return { fa: [n, d], text: `${n}/${d}` };
 }
 const fracTok = (n, d, whole) => ({ f: [n, d, whole] });
@@ -327,7 +328,7 @@ const fracTok = (n, d, whole) => ({ f: [n, d, whole] });
 const GEN = {
   compose(rng, { total }) {
     const a = R(rng)(1, total - 1);
-    return buildH([{ n: total }, { w: 'は' }, { n: a }, { w: 'と' }, { ans: total - a }], { title: 'いくつといくつ', text: `${total}は${a}と`, answer: String(total - a), help: `${a}に いくつで ${total}` });
+    return buildH([{ n: total }, { op: '＝' }, { n: a }, { op: '＋' }, { ans: total - a }], { title: '数的分解', text: `${total} = ${a} +`, answer: String(total - a), help: `${a}再加几等于${total}？` });
   },
   hadd(rng, { a, b, carry, tensToo }) {
     const r = R(rng);
@@ -338,8 +339,8 @@ const GEN = {
       if (carry === 'none' && c) continue;
       if (carry === 'yes' && !c) continue;
       if (rng() < 0.5 && !tensToo) [x, y] = [y, x];
-      const help = carry === 'yes' ? `${x}に ${10 - (x % 10)}で 10` : null;
-      return buildH([{ n: x }, { op: '＋' }, { n: y }, { op: '＝' }, { ans: x + y }], { title: 'たしざん', text: `${x} + ${y}`, answer: String(x + y), help: help || `${x} ＋ ${y}` });
+      const help = carry === 'yes' ? `${x}加${10 - (x % 10)}等于10` : null;
+      return buildH([{ n: x }, { op: '＋' }, { n: y }, { op: '＝' }, { ans: x + y }], { title: '加法', text: `${x} + ${y}`, answer: String(x + y), help: help || `${x} ＋ ${y}` });
     }
     throw new Error('hadd');
   },
@@ -353,7 +354,7 @@ const GEN = {
       if (borrow === 'none' && br) continue;
       if (borrow === 'yes' && !br) continue;
       const help = borrow === 'yes' ? `10 − ${y} ＝ ${10 - y}` : `${x} − ${y}`;
-      return buildH([{ n: x }, { op: '−' }, { n: y }, { op: '＝' }, { ans: x - y }], { title: 'ひきざん', text: `${x} − ${y}`, answer: String(x - y), help });
+      return buildH([{ n: x }, { op: '−' }, { n: y }, { op: '＝' }, { ans: x - y }], { title: '减法', text: `${x} − ${y}`, answer: String(x - y), help });
     }
     throw new Error('hsub');
   },
@@ -364,38 +365,38 @@ const GEN = {
       const o1 = rng() < 0.6 ? '＋' : '−'; const o2 = rng() < 0.6 ? '＋' : '−';
       const s1 = o1 === '＋' ? a + b : a - b; if (s1 < 0) continue;
       const s2 = o2 === '＋' ? s1 + c : s1 - c; if (s2 < 0 || s2 > 20) continue;
-      return buildH([{ n: a }, { op: o1 }, { n: b }, { op: o2 }, { n: c }, { op: '＝' }, { ans: s2 }], { title: '3つのかず', text: `${a}${o1}${b}${o2}${c}`, answer: String(s2), help: `まず ${a} ${o1} ${b} ＝ ${s1}` });
+      return buildH([{ n: a }, { op: o1 }, { n: b }, { op: o2 }, { n: c }, { op: '＝' }, { ans: s2 }], { title: '三个数的加减', text: `${a}${o1}${b}${o2}${c}`, answer: String(s2), help: `先算 ${a} ${o1} ${b} ＝ ${s1}` });
     }
     throw new Error('add3');
   },
   kuku(rng, { dans }) {
     const a = pickOf(rng, dans); const b = R(rng)(1, 9);
-    return buildH([{ n: a }, { op: '×' }, { n: b }, { op: '＝' }, { ans: a * b }], { title: 'かけざん', text: `${a} × ${b}`, answer: String(a * b), help: table(a, a * (b - 1)) });
+    return buildH([{ n: a }, { op: '×' }, { n: b }, { op: '＝' }, { ans: a * b }], { title: '乘法', text: `${a} × ${b}`, answer: String(a * b), help: table(a, a * (b - 1)) });
   },
   mulTens(rng) {
     const a = R(rng)(1, 9) * 10; const b = R(rng)(2, 9);
-    return buildH([{ n: a }, { op: '×' }, { n: b }, { op: '＝' }, { ans: a * b }], { title: 'かけざん', text: `${a} × ${b}`, answer: String(a * b), help: `${a / 10} × ${b} の 10こぶん` });
+    return buildH([{ n: a }, { op: '×' }, { n: b }, { op: '＝' }, { ans: a * b }], { title: '乘法', text: `${a} × ${b}`, answer: String(a * b), help: `先算 ${a / 10} × ${b}，再乘10` });
   },
   fracOf(rng, { dens }) {
     const d = pickOf(rng, dens); const q = R(rng)(1, 9);
-    return buildH([{ n: q * d }, { w: 'の' }, fracTok(1, d), { w: 'は' }, { ans: q }], { title: 'ぶんすう', text: `${q * d}の1/${d}`, answer: String(q), help: `${q * d}を ${d}つに わける` });
+    return buildH([{ n: q * d }, { w: '的' }, fracTok(1, d), { w: '是' }, { ans: q }], { title: '认识分数', text: `${q * d}的1/${d}`, answer: String(q), help: `把${q * d}平均分成${d}份` });
   },
   div(rng) {
     const d = R(rng)(2, 9); const q = R(rng)(1, 9);
-    return buildH([{ n: q * d }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q }], { title: 'わりざん', text: `${q * d} ÷ ${d}`, answer: String(q), help: table(d, q * d) });
+    return buildH([{ n: q * d }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q }], { title: '除法', text: `${q * d} ÷ ${d}`, answer: String(q), help: table(d, q * d) });
   },
   divRem(rng) {
     const d = R(rng)(2, 9); const q = R(rng)(1, 9); const rem = R(rng)(1, d - 1);
     const D = q * d + rem;
-    return buildH([{ n: D }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q, label: '商' }, { w: 'あまり' }, { ans: rem, label: 'あまり' }], { title: 'あまりのあるわりざん', text: `${D} ÷ ${d}`, answer: `${q} あまり ${rem}`, help: table(d, D) });
+    return buildH([{ n: D }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q, label: '商' }, { w: '余' }, { ans: rem, label: '余' }], { title: '有余数的除法', text: `${D} ÷ ${d}`, answer: `${q} 余 ${rem}`, help: table(d, D) });
   },
   divTens(rng) {
     const r = R(rng);
     for (let g = 0; g < 200; g++) {
       const d = r(2, 9);
-      if (rng() < 0.5) { const q = r(1, 9); if (q * d * 10 > 99) continue; return buildH([{ n: q * d * 10 }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q * 10 }], { title: 'わりざん', text: `${q * d * 10} ÷ ${d}`, answer: String(q * 10), help: `${q * d} ÷ ${d} の 10こぶん` }); }
+      if (rng() < 0.5) { const q = r(1, 9); if (q * d * 10 > 99) continue; return buildH([{ n: q * d * 10 }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: q * 10 }], { title: '除法', text: `${q * d * 10} ÷ ${d}`, answer: String(q * 10), help: `先算 ${q * d} ÷ ${d}，再乘10` }); }
       const t = r(1, 4); const o = r(1, 4); const D = (t * 10 + o) * d; if (D > 99 || Math.floor(D / 10) % d || (D % 10) % d) continue;
-      return buildH([{ n: D }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: D / d }], { title: 'わりざん', text: `${D} ÷ ${d}`, answer: String(D / d), help: `${Math.floor(D / 10) * 10} ÷ ${d} と ${D % 10} ÷ ${d}` });
+      return buildH([{ n: D }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: D / d }], { title: '除法', text: `${D} ÷ ${d}`, answer: String(D / d), help: `分别算 ${Math.floor(D / 10) * 10} ÷ ${d} 和 ${D % 10} ÷ ${d}` });
     }
     throw new Error('divTens');
   },
@@ -471,16 +472,16 @@ const GEN = {
     for (let g = 0; g < 200; g++) {
       const d = r(2, 9); const q = r(11, 99); if (q % 10 === 0) continue;
       const D = q * d; if (D % 10 === 0 || D > 999) continue;
-      return buildH([{ n: decStr(D, 1) }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: decStr(q, 1) }], { title: '小数のわりざん', text: `${decStr(D, 1)} ÷ ${d}`, answer: decStr(q, 1), help: `${D} ÷ ${d} を 考える` });
+      return buildH([{ n: decStr(D, 1) }, { op: '÷' }, { n: d }, { op: '＝' }, { ans: decStr(q, 1) }], { title: '小数除法', text: `${decStr(D, 1)} ÷ ${d}`, answer: decStr(q, 1), help: `先算 ${D} ÷ ${d}` });
     }
     throw new Error('decDivInt');
   },
   decDivDec(rng) {
     const r = R(rng);
     const d = r(2, 9); const q = r(2, 9);
-    if (rng() < 0.5) { const D = d * q; return buildH([{ n: decStr(D, 1) }, { op: '÷' }, { n: decStr(d, 1) }, { op: '＝' }, { ans: q }], { title: '小数のわりざん', text: `${decStr(D, 1)} ÷ ${decStr(d, 1)}`, answer: String(q), help: `${D} ÷ ${d} と 同じ` }); }
+    if (rng() < 0.5) { const D = d * q; return buildH([{ n: decStr(D, 1) }, { op: '÷' }, { n: decStr(d, 1) }, { op: '＝' }, { ans: q }], { title: '小数除法', text: `${decStr(D, 1)} ÷ ${decStr(d, 1)}`, answer: String(q), help: `与 ${D} ÷ ${d} 相同` }); }
     const d2 = r(11, 29); const D2 = d2 * q;
-    return buildH([{ n: decStr(D2, 1) }, { op: '÷' }, { n: decStr(d2, 1) }, { op: '＝' }, { ans: q }], { title: '小数のわりざん', text: `${decStr(D2, 1)} ÷ ${decStr(d2, 1)}`, answer: String(q), help: `${D2} ÷ ${d2} と 同じ` });
+    return buildH([{ n: decStr(D2, 1) }, { op: '÷' }, { n: decStr(d2, 1) }, { op: '＝' }, { ans: q }], { title: '小数除法', text: `${decStr(D2, 1)} ÷ ${decStr(d2, 1)}`, answer: String(q), help: `与 ${D2} ÷ ${d2} 相同` });
   },
   gcdlcm(rng, { kind }) {
     const r = R(rng);
@@ -489,8 +490,8 @@ const GEN = {
       if (a === b || a < 4 || b < 4) continue;
       const ans = kind === 'gcd' ? gcd(a, b) : lcm(a, b);
       if (ans === 1 || ans > 99) continue;
-      const w = kind === 'gcd' ? '最大公約数' : '最小公倍数';
-      return buildH([{ n: a }, { w: 'と' }, { n: b }, { w: 'の' }, { br: true }, { w }, { op: '＝' }, { ans }], { title: w, text: `${a}と${b}の${w}`, answer: String(ans), help: kind === 'gcd' ? `どちらも わりきれる 数` : `${Math.max(a, b)}のばいすう` });
+      const w = kind === 'gcd' ? '最大公因数' : '最小公倍数';
+      return buildH([{ n: a }, { w: '和' }, { n: b }, { w: '的' }, { br: true }, { w }, { op: '＝' }, { ans }], { title: w, text: `${a}和${b}的${w}`, answer: String(ans), help: kind === 'gcd' ? '找出两个数共有的最大因数' : `从${Math.max(a, b)}的倍数中找` });
     }
     throw new Error('gcdlcm');
   },
@@ -500,12 +501,12 @@ const GEN = {
       const a = r(2, 9); const b = r(2, 9); const c = r(2, 9);
       const form = r(0, 3);
       let toks; let ans; let help;
-      if (form === 0) { ans = a + b * c; toks = [{ n: a }, { op: '＋' }, { n: b }, { op: '×' }, { n: c }]; help = `先に ${b} × ${c}`; }
-      else if (form === 1) { ans = a * (b + c); toks = [{ n: a }, { op: '×' }, { op: '(' }, { n: b }, { op: '＋' }, { n: c }, { op: ')' }]; help = `先に ${b} ＋ ${c}`; }
-      else if (form === 2) { if (a <= b) continue; ans = (a - b) * c; toks = [{ op: '(' }, { n: a }, { op: '−' }, { n: b }, { op: ')' }, { op: '×' }, { n: c }]; help = `先に ${a} − ${b}`; }
-      else { const bc = b * c; const x = r(bc + 1, bc + 30); ans = x - bc; toks = [{ n: x }, { op: '−' }, { n: b }, { op: '×' }, { n: c }]; help = `先に ${b} × ${c}`; }
+      if (form === 0) { ans = a + b * c; toks = [{ n: a }, { op: '＋' }, { n: b }, { op: '×' }, { n: c }]; help = `先算 ${b} × ${c}`; }
+      else if (form === 1) { ans = a * (b + c); toks = [{ n: a }, { op: '×' }, { op: '(' }, { n: b }, { op: '＋' }, { n: c }, { op: ')' }]; help = `先算 ${b} ＋ ${c}`; }
+      else if (form === 2) { if (a <= b) continue; ans = (a - b) * c; toks = [{ op: '(' }, { n: a }, { op: '−' }, { n: b }, { op: ')' }, { op: '×' }, { n: c }]; help = `先算 ${a} − ${b}`; }
+      else { const bc = b * c; const x = r(bc + 1, bc + 30); ans = x - bc; toks = [{ n: x }, { op: '−' }, { n: b }, { op: '×' }, { n: c }]; help = `先算 ${b} × ${c}`; }
       if (ans <= 0 || ans > 999) continue;
-      return buildH([...toks, { op: '＝' }, { ans }], { title: 'けいさんのきまり', text: toks.map((t) => t.n ?? t.op).join(''), answer: String(ans), help });
+      return buildH([...toks, { op: '＝' }, { ans }], { title: '混合运算', text: toks.map((t) => t.n ?? t.op).join(''), answer: String(ans), help });
     }
     throw new Error('order');
   },
@@ -516,14 +517,14 @@ const GEN = {
     const unit = 10 ** pl; const ans = Math.round(n / unit) * unit;
     if (String(ans).length > len) return GEN.round(rng);
     const nm = ['十', '百', '千'][pl - 1];
-    return buildH([{ n }, { w: 'を' }, { br: true }, { w: `${nm}の位まで` }, { op: '→' }, { ans }], { title: 'がい数', text: `${n}を${nm}の位までのがい数に`, answer: String(ans), help: `${['一', '十', '百'][pl - 1]}の位を 四捨五入` });
+    return buildH([{ n }, { br: true }, { w: `保留到${nm}位` }, { op: '→' }, { ans }], { title: '求近似数', text: `${n}保留到${nm}位`, answer: String(ans), help: `把${['个', '十', '百'][pl - 1]}位四舍五入` });
   },
   percent(rng) {
     const r = R(rng);
     for (let g = 0; g < 200; g++) {
       const base = pickOf(rng, [20, 40, 50, 60, 80, 100, 200, 300, 400, 500]); const p = pickOf(rng, [5, 10, 20, 25, 30, 40, 50, 60, 75]);
       const ans = (base * p) / 100; if (!Number.isInteger(ans) || ans === 0) continue;
-      return buildH([{ n: base }, { w: 'の' }, { n: p }, { op: '%' }, { op: '＝' }, { ans }], { title: '百分率', text: `${base}の${p}%`, answer: String(ans), help: `${base} × ${p / 100}` });
+      return buildH([{ n: base }, { w: '的' }, { n: p }, { op: '%' }, { op: '＝' }, { ans }], { title: '百分数', text: `${base}的${p}%`, answer: String(ans), help: `${base} × ${p / 100}` });
     }
     throw new Error('percent');
   },
@@ -533,7 +534,7 @@ const GEN = {
     const [x, y] = reduce(a, b); const k = r(2, 9);
     const hideLeft = rng() < 0.5;
     const toks = hideLeft ? [{ n: x }, { op: '：' }, { n: y }, { op: '＝' }, { ans: x * k }, { op: '：' }, { n: y * k }] : [{ n: x }, { op: '：' }, { n: y }, { op: '＝' }, { n: x * k }, { op: '：' }, { ans: y * k }];
-    return buildH(toks, { title: 'ひ', text: `${x}:${y}`, answer: String(hideLeft ? x * k : y * k), help: `${k}ばい` });
+    return buildH(toks, { title: '相等的比', text: `${x}:${y}`, answer: String(hideLeft ? x * k : y * k), help: `扩大到${k}倍` });
   },
   letter(rng) {
     const r = R(rng);
@@ -542,15 +543,15 @@ const GEN = {
     let toks; let help;
     if (form === 0) { toks = [{ n: 'x' }, { op: '×' }, { n: a }, { op: '＝' }, { n: x * a }]; help = `${x * a} ÷ ${a}`; }
     else if (form === 1) { toks = [{ n: 'x' }, { op: '＋' }, { n: a * 3 }, { op: '＝' }, { n: x + a * 3 }]; help = `${x + a * 3} − ${a * 3}`; }
-    else { toks = [{ n: 'x' }, { op: '−' }, { n: a }, { op: '＝' }, { n: x }]; help = `${x} ＋ ${a}`; return buildH([...toks, { br: true }, { n: 'x' }, { op: '＝' }, { ans: x + a }], { title: 'xをもとめる', text: toks.map((t) => t.n ?? t.op ?? t.w).join(''), answer: String(x + a), help }); }
-    return buildH([...toks, { br: true }, { n: 'x' }, { op: '＝' }, { ans: x }], { title: 'xをもとめる', text: toks.map((t) => t.n ?? t.op ?? t.w).join(''), answer: String(x), help });
+    else { toks = [{ n: 'x' }, { op: '−' }, { n: a }, { op: '＝' }, { n: x }]; help = `${x} ＋ ${a}`; return buildH([...toks, { br: true }, { n: 'x' }, { op: '＝' }, { ans: x + a }], { title: '求未知数 x', text: toks.map((t) => t.n ?? t.op ?? t.w).join(''), answer: String(x + a), help }); }
+    return buildH([...toks, { br: true }, { n: 'x' }, { op: '＝' }, { ans: x }], { title: '求未知数 x', text: toks.map((t) => t.n ?? t.op ?? t.w).join(''), answer: String(x), help });
   },
   frac(rng, { op, same, maxOne, mixed }) {
     const r = R(rng);
     for (let g = 0; g < 600; g++) {
       if (op === 'reduce') {
         const d = r(2, 9); const n = r(1, d - 1); const k = r(2, 6); if (gcd(n, d) !== 1) continue;
-        return buildH([fracTok(n * k, d * k), { op: '＝' }, { fa: [n, d] }], { title: '約分', text: `${n * k}/${d * k}`, answer: `${n}/${d}`, help: `${k}で わる` });
+        return buildH([fracTok(n * k, d * k), { op: '＝' }, { fa: [n, d] }], { title: '约分', text: `${n * k}/${d * k}`, answer: `${n}/${d}`, help: `分子和分母都除以${k}` });
       }
       if (op === 'addsub' && same) {
         const d = r(3, 12); const add = rng() < 0.55;
@@ -561,12 +562,12 @@ const GEN = {
           if (gcd(res % d, d) !== 1 && res % d) continue;
           const t1 = fracTok(n1, d, w1); const t2 = fracTok(n2, d, w2 || undefined);
           const fa = { fa: [res % d, d, Math.floor(res / d) || undefined] };
-          return buildH([t1, { op: add ? '＋' : '−' }, t2, { op: '＝' }, fa], { title: '分数のたしひき', text: `${w1}と${n1}/${d} ${add ? '+' : '−'} ${w2}と${n2}/${d}`, answer: res >= d ? `${Math.floor(res / d)}と${res % d}/${d}` : `${res}/${d}`, help: `分母は ${d} のまま` });
+          return buildH([t1, { op: add ? '＋' : '−' }, t2, { op: '＝' }, fa], { title: '分数加减法', text: `${w1}又${n1}/${d} ${add ? '+' : '−'} ${w2 ? `${w2}又` : ''}${n2}/${d}`, answer: res >= d ? `${Math.floor(res / d)}又${res % d}/${d}` : `${res}/${d}`, help: `分母不变，仍是${d}` });
         }
         const n1 = r(1, d - 1); const n2 = r(1, d - 1);
         const res = add ? n1 + n2 : n1 - n2;
         if (res <= 0 || (maxOne && res >= d)) continue;
-        return buildH([fracTok(n1, d), { op: add ? '＋' : '−' }, fracTok(n2, d), { op: '＝' }, { fa: [res, d] }], { title: '分数のたしひき', text: `${n1}/${d} ${add ? '+' : '−'} ${n2}/${d}`, answer: `${res}/${d}`, help: `分母は ${d} のまま` });
+        return buildH([fracTok(n1, d), { op: add ? '＋' : '−' }, fracTok(n2, d), { op: '＝' }, { fa: [res, d] }], { title: '分数加减法', text: `${n1}/${d} ${add ? '+' : '−'} ${n2}/${d}`, answer: `${res}/${d}`, help: `分母不变，仍是${d}` });
       }
       if (op === 'addsub') {
         const d1 = r(2, 9); const d2 = r(2, 9); if (d1 === d2) continue;
@@ -575,7 +576,7 @@ const GEN = {
         const res = add ? n1 * (L / d1) + n2 * (L / d2) : n1 * (L / d1) - n2 * (L / d2);
         if (res <= 0 || res >= L) continue;
         const [rn, rd] = reduce(res, L);
-        return buildH([fracTok(n1, d1), { op: add ? '＋' : '−' }, fracTok(n2, d2), { op: '＝' }, { fa: [rn, rd] }], { title: '分数のたしひき', text: `${n1}/${d1} ${add ? '+' : '−'} ${n2}/${d2}`, answer: `${rn}/${rd}`, help: `通分すると 分母は ${L}` });
+        return buildH([fracTok(n1, d1), { op: add ? '＋' : '−' }, fracTok(n2, d2), { op: '＝' }, { fa: [rn, rd] }], { title: '分数加减法', text: `${n1}/${d1} ${add ? '+' : '−'} ${n2}/${d2}`, answer: `${rn}/${rd}`, help: `通分后分母是${L}` });
       }
       if (op === 'muldivInt') {
         const d = r(2, 9); const n = r(1, d - 1); const k = r(2, 9); if (gcd(n, d) !== 1) continue;
@@ -583,7 +584,7 @@ const GEN = {
         const [rn, rd] = mul ? reduce(n * k, d) : reduce(n, d * k);
         if (rd === 1) continue;
         const a = fracAns(rn, rd, true);
-        return buildH([fracTok(n, d), { op: mul ? '×' : '÷' }, { n: k }, { op: '＝' }, a], { title: '分数と整数', text: `${n}/${d} ${mul ? '×' : '÷'} ${k}`, answer: a.text, help: mul ? `分子に ${k} をかける` : `分母に ${k} をかける` });
+        return buildH([fracTok(n, d), { op: mul ? '×' : '÷' }, { n: k }, { op: '＝' }, a], { title: '分数与整数', text: `${n}/${d} ${mul ? '×' : '÷'} ${k}`, answer: a.text, help: mul ? `分子乘${k}，然后约分` : `分母乘${k}，然后约分` });
       }
       if (op === 'mul' || op === 'div') {
         const d1 = r(2, 9); const n1 = r(1, 9); const d2 = r(2, 9); const n2 = r(1, 9);
@@ -591,26 +592,179 @@ const GEN = {
         const [rn, rd] = op === 'mul' ? reduce(n1 * n2, d1 * d2) : reduce(n1 * d2, d1 * n2);
         if (rd === 1 || rn > 99 || rd > 99) continue;
         const a = fracAns(rn, rd, true);
-        return buildH([fracTok(n1, d1), { op: op === 'mul' ? '×' : '÷' }, fracTok(n2, d2), { op: '＝' }, a], { title: op === 'mul' ? '分数のかけざん' : '分数のわりざん', text: `${n1}/${d1} ${op === 'mul' ? '×' : '÷'} ${n2}/${d2}`, answer: a.text, help: op === 'mul' ? '分母どうし・分子どうしをかける' : `${n2}/${d2} を ひっくりかえして かける` });
+        return buildH([fracTok(n1, d1), { op: op === 'mul' ? '×' : '÷' }, fracTok(n2, d2), { op: '＝' }, a], { title: op === 'mul' ? '分数乘法' : '分数除法', text: `${n1}/${d1} ${op === 'mul' ? '×' : '÷'} ${n2}/${d2}`, answer: a.text, help: op === 'mul' ? '分子相乘，分母也相乘' : `乘以${n2}/${d2}的倒数` });
       }
       if (op === 'decimal') {
         const t = pickOf(rng, [2, 4, 5, 6, 8]); const d = r(2, 9); const n = r(1, d - 1); if (gcd(n, d) !== 1) continue;
         const [rn, rd] = reduce(t * n, 10 * d);
         if (rd === 1 || rn > 99 || rd > 99) continue;
-        return buildH([{ n: decStr(t, 1) }, { op: '×' }, fracTok(n, d), { op: '＝' }, { fa: [rn, rd] }], { title: '小数と分数', text: `${decStr(t, 1)} × ${n}/${d}`, answer: `${rn}/${rd}`, help: `${decStr(t, 1)} ＝ ${t}/10` });
+        return buildH([{ n: decStr(t, 1) }, { op: '×' }, fracTok(n, d), { op: '＝' }, { fa: [rn, rd] }], { title: '小数与分数', text: `${decStr(t, 1)} × ${n}/${d}`, answer: `${rn}/${rd}`, help: `${decStr(t, 1)} ＝ ${t}/10` });
       }
     }
     throw new Error(`frac ${op}`);
   },
 };
 
+const answerText = (p) => p.skill === 'g1-compose10' ? `${p.text} ${p.answer}` : `${p.text} ＝ ${p.answer}`;
+
+// Translate display text in saved problems without changing their answer steps.
+export function localizeProblem(problem) {
+  if (!problem || typeof problem !== 'object') return problem;
+  const p = structuredClone(problem);
+  const translate = (value) => {
+    if (typeof value !== 'string') return value;
+    return value
+      .replace(/^(\d+)は(\d+)と$/, '$1 = $2 +')
+      .replace(/^(\d+)と(\d+)の(最大公約数|最小公倍数)$/, '$1和$2的$3')
+      .replace(/^(\d+)を([十百千])の位までのがい数に$/, '$1保留到$2位')
+      .replace(/(\d+)と(\d+\/\d+)/g, '$1又$2')
+      .replace(/( [＋+−-] )0又/g, '$1')
+      .replace(/(\d+)の中に(\d+)はいくつ/g, '$1里面有几个$2？')
+      .replace(/(\d+)のだん /g, '$1的乘法口诀：')
+      .replace(/(\d+)に (\d+)で 10/g, '$1加$2等于10')
+      .replace(/(\d+)に いくつで (\d+)/g, '$1再加几等于$2？')
+      .replace(/(\d+)を (\d+)つに わける/g, '把$1平均分成$2份')
+      .replace(/(\d+)で わる/g, '分子和分母都除以$1')
+      .replace(/分子に (\d+) をかける/g, '分子乘$1，然后约分')
+      .replace(/分母に (\d+) をかける/g, '分母乘$1，然后约分')
+      .replace(/(\d+\/\d+) を ひっくりかえして かける/g, '乘以$1的倒数')
+      .replace(/通分すると 分母は (\d+)/g, '通分后分母是$1')
+      .replace(/分母は (\d+) のまま/g, '分母不变，仍是$1')
+      .replace(/([\d ×÷]+) の 10こぶん/g, '先算$1，再乘10')
+      .replace(/([\d ÷]+) と ([\d ÷]+)/g, '分别算$1和$2')
+      .replace(/([\d ÷]+) を 考える/g, '先算$1')
+      .replace(/([\d ÷]+) と 同じ/g, '与$1相同')
+      .replace(/(\d+)のばいすう/g, '从$1的倍数中找')
+      .replace(/どちらも わりきれる 数/g, '找出两个数共有的最大因数')
+      .replace(/([一十百])の位を 四捨五入/g, (_, unit) => `把${unit === '一' ? '个' : unit}位四舍五入`)
+      .replace(/([十百千])の位まで/g, '保留到$1位')
+      .replace(/(\d+)をかける/g, '乘 $1')
+      .replace(/(\d+)ばい/g, '扩大到$1倍')
+      .replace(/小数のたしざん/g, '小数加法').replace(/小数のひきざん/g, '小数减法')
+      .replace(/小数のかけざん/g, '小数乘法').replace(/小数のわりざん/g, '小数除法')
+      .replace(/分数のたしひき/g, '分数加减法').replace(/分数のかけざん/g, '分数乘法').replace(/分数のわりざん/g, '分数除法')
+      .replace(/あまりのあるわりざん/g, '有余数的除法').replace(/いくつといくつ/g, '数的分解')
+      .replace(/3つのかず/g, '三个数的加减').replace(/けいさんのきまり/g, '混合运算')
+      .replace(/小数と分数/g, '小数与分数').replace(/分数と整数/g, '分数与整数')
+      .replace(/くりあがりの/g, '进位的').replace(/ひいた のこり/g, '相减后剩下的数')
+      .replace(/整数の部分/g, '整数部分').replace(/分母どうし・分子どうしをかける/g, '分子相乘，分母也相乘')
+      .replace(/たす（/g, '相加（').replace(/商の/g, '商的').replace(/先に /g, '先算 ').replace(/まず /g, '先算 ')
+      .replace(/たしざん/g, '加法').replace(/ひきざん/g, '减法').replace(/かけざん/g, '乘法').replace(/わりざん/g, '除法')
+      .replace(/あまり/g, '余').replace(/こたえ/g, '答案').replace(/ぶんすう/g, '认识分数')
+      .replace(/最大公約数/g, '最大公因数').replace(/約分/g, '约分').replace(/百分率/g, '百分数')
+      .replace(/がい数/g, '求近似数').replace(/四捨五入/g, '四舍五入').replace(/xをもとめる/g, '求未知数 x')
+      .replace(/^ひ$/, '相等的比')
+      .replace(/小数第一位/g, '十分位').replace(/小数第二位/g, '百分位').replace(/小数第三位/g, '千分位')
+      .replace(/一の位/g, '个位').replace(/十の位/g, '十位').replace(/百の位/g, '百位').replace(/千の位/g, '千位').replace(/万の位/g, '万位')
+      .replace(/(\d+)の(?=\d)/g, '$1的');
+  };
+  for (const key of ['title', 'text', 'answer', 'answerText', 'help']) if (key in p) p[key] = translate(p[key]);
+  if (Array.isArray(p.cells)) for (const cell of p.cells) {
+    if (!cell || typeof cell !== 'object') continue;
+    if (cell.kind === 'word' && cell.text === 'は') cell.text = p.skill === 'g1-compose10' ? '＝' : '是';
+    else if (cell.kind === 'word' && cell.text === 'と') cell.text = p.skill === 'g1-compose10' ? '＋' : '和';
+    else if (cell.kind === 'word' && cell.text === 'の') cell.text = '的';
+    else if (cell.kind === 'word' && cell.text === 'を') cell.text = '取';
+    else cell.text = translate(cell.text);
+  }
+  if (Array.isArray(p.steps)) for (const step of p.steps) {
+    if (!step || typeof step !== 'object') continue;
+    if ('label' in step) step.label = translate(step.label);
+    if (step.hint != null) step.hint = translate(step.hint);
+    if (step.help && typeof step.help === 'object' && Array.isArray(step.help.ids)) step.help.text = translate(step.help.text);
+    else delete step.help;
+  }
+  if (p.answerText != null && p.text != null && p.answer != null) p.answerText = answerText(p);
+  return p;
+}
+
+// Translate only the display copy; saved problems and their signatures stay unchanged.
+export function displayProblem(problem) {
+  if (getLanguage() !== 'en' || !problem || typeof problem !== 'object') return problem;
+  const p = localizeProblem(problem);
+  const names = {
+    '数的分解': 'Number bonds', '加法': 'Addition', '减法': 'Subtraction',
+    '小数加法': 'Decimal addition', '小数减法': 'Decimal subtraction',
+    '乘法': 'Multiplication', '小数乘法': 'Decimal multiplication',
+    '除法': 'Division', '有余数的除法': 'Division with remainders', '小数除法': 'Decimal division',
+    '三个数的加减': 'Adding and subtracting three numbers', '认识分数': 'Fractions',
+    '最大公因数': 'Greatest common factor', '最小公倍数': 'Least common multiple',
+    '混合运算': 'Order of operations', '求近似数': 'Rounding', '百分数': 'Percentages',
+    '相等的比': 'Equivalent ratios', '求未知数 x': 'Solve for x', '约分': 'Simplify fractions',
+    '分数加减法': 'Adding and subtracting fractions', '分数与整数': 'Fractions and whole numbers',
+    '分数乘法': 'Multiplying fractions', '分数除法': 'Dividing fractions', '小数与分数': 'Decimals and fractions',
+    '答案': 'Answer', '商': 'Quotient', '余': 'Remainder', '整数部分': 'Whole number',
+    '分子': 'Numerator', '分母': 'Denominator', '相减后剩下的数': 'Difference',
+    '个位': 'Ones', '十位': 'Tens', '百位': 'Hundreds', '千位': 'Thousands',
+    '万位': 'Ten thousands', '十万位': 'Hundred thousands',
+    '十分位': 'Tenths', '百分位': 'Hundredths', '千分位': 'Thousandths',
+    '找出两个数共有的最大因数': 'Find the greatest factor shared by both numbers',
+    '分子相乘，分母也相乘': 'Multiply the numerators, then multiply the denominators',
+  };
+  const places = { 个: 'ones', 十: 'tens', 百: 'hundreds', 千: 'thousands' };
+  const translate = (value) => {
+    if (typeof value !== 'string') return value;
+    if (names[value]) return names[value];
+    return value
+      .replace(/^(\d+)和(\d+)的最大公因数$/, 'Greatest common factor of $1 and $2')
+      .replace(/^(\d+)和(\d+)的最小公倍数$/, 'Least common multiple of $1 and $2')
+      .replace(/^(\d+)保留到([十百千])位$/, (_, n, unit) => `Round ${n} to the nearest ${places[unit].slice(0, -1)}`)
+      .replace(/^(\d+)的(\d+\/\d+)$/, '$1 × $2')
+      .replace(/^(\d+)的(\d+)%$/, '$2% of $1')
+      .replace(/^(\d+)的乘法口诀：/, '$1 times table: ')
+      .replace(/^(\d+)再加几等于(\d+)？$/, 'What must be added to $1 to make $2?')
+      .replace(/^(\d+)加(\d+)等于10$/, '$1 + $2 = 10')
+      .replace(/^把(\d+)平均分成(\d+)份$/, 'Split $1 into $2 equal parts')
+      .replace(/^(\d+)里面有几个(\d+)？$/, 'How many $2s fit into $1?')
+      .replace(/^先算\s*(.*)，再乘10$/, 'First calculate $1, then multiply by 10')
+      .replace(/^先算\s*(.*)$/, 'First calculate $1')
+      .replace(/^分别算\s*(.+?)\s*和\s*(.+)$/, 'Calculate $1 and $2 separately')
+      .replace(/^与\s*(.+?)\s*相同$/, 'The same as $1')
+      .replace(/^从(\d+)的倍数中找$/, 'Look among multiples of $1')
+      .replace(/^把([个十百])位四舍五入$/, (_, unit) => `Use the ${places[unit]} digit to round`)
+      .replace(/^分子和分母都除以(\d+)$/, 'Divide the numerator and denominator by $1')
+      .replace(/^分母不变，仍是(\d+)$/, 'The denominator stays $1')
+      .replace(/^通分后分母是(\d+)$/, 'Use the common denominator $1')
+      .replace(/^分子乘(\d+)，然后约分$/, 'Multiply the numerator by $1, then simplify')
+      .replace(/^分母乘(\d+)，然后约分$/, 'Multiply the denominator by $1, then simplify')
+      .replace(/^乘以(\d+\/\d+)的倒数$/, 'Multiply by the reciprocal of $1')
+      .replace(/^扩大到(\d+)倍$/, 'Multiply both parts by $1')
+      .replace(/^进位的\s*(\d+)$/, 'Carry $1')
+      .replace(/^乘\s*(\d+)$/, 'Multiply by $1')
+      .replace(/^商的(.+)$/, (_, place) => `Quotient: ${names[place] || place}`)
+      .replace(/^相加（(.+)）$/, (_, place) => `Add: ${names[place] || place}`)
+      .replace(/(\d+)又(?=\d+\/\d+)/g, '$1 ')
+      .replace(/\s*余\s*/g, ' remainder ');
+  };
+  for (const key of ['title', 'text', 'answer', 'help']) if (key in p) p[key] = translate(p[key]);
+  if (p.answerText != null && p.text != null && p.answer != null) p.answerText = answerText(p);
+  if (Array.isArray(p.cells)) for (const cell of p.cells) {
+    if (cell?.kind !== 'word') continue;
+    if (cell.text === '的') cell.text = p.title === 'Greatest common factor' || p.title === 'Least common multiple' ? '' : '×';
+    else if (cell.text === '是') cell.text = '＝';
+    else if (cell.text === '和') cell.text = ',';
+    else if (cell.text === '余') cell.text = 'R';
+    else if (cell.text === '最大公因数') cell.text = 'GCF';
+    else if (cell.text === '最小公倍数') cell.text = 'LCM';
+    else if (/^保留到[十百千]位$/.test(cell.text)) cell.text = `≈${{ 十: '10', 百: '100', 千: '1000' }[cell.text[3]]}`;
+    else cell.text = translate(cell.text);
+  }
+  if (Array.isArray(p.steps)) for (const step of p.steps) {
+    if (!step || typeof step !== 'object') continue;
+    if ('label' in step) step.label = translate(step.label);
+    if (step.hint != null) step.hint = translate(step.hint);
+    if (step.help && typeof step.help === 'object') step.help.text = translate(step.help.text);
+  }
+  return p;
+}
+
 // Signature used to avoid repeats.
 export const signature = (p) => `${p.title}|${p.text}`;
 
 // Make one problem for a skill, avoiding signatures in `recent` when possible.
 export function makeProblem(skillId, rng, recent = null) {
+  if (!Object.hasOwn(SKILL, skillId)) throw new Error(`unknown skill ${skillId}`);
   const sk = SKILL[skillId];
-  if (!sk) throw new Error(`unknown skill ${skillId}`);
   const [name, params] = sk.gen;
   let p;
   for (let tries = 0; tries < 40; tries++) {
@@ -622,7 +776,7 @@ export function makeProblem(skillId, rng, recent = null) {
 }
 
 function finalize(p) {
-  p.answerText = p.kind === 'h' ? `${p.text} ＝ ${p.answer}` : `${p.text} ＝ ${p.answer}`;
+  p.answerText = answerText(p);
   return p;
 }
 

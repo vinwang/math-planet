@@ -1,5 +1,6 @@
 // Local-only persistence (localStorage). Nothing is sent to a server.
 // Every read tolerates missing, blocked, or corrupted storage.
+import { localizeProblem, signature } from './problems.js';
 
 const KEY = 'dopa-drill:v1';
 const VERSION = 1;
@@ -8,8 +9,20 @@ export function defaultState() {
   return {
     version: VERSION,
     guideSeen: false,
-    settings: { count: 10, sound: true, volume: 0.8, motion: null },
+    settings: { count: 10, sound: true, volume: 0.8, motion: null, language: 'zh-CN' },
     history: [],
+  };
+}
+
+export const normalizeCount = (count) => [6, 10, 14].includes(count) ? count : 10;
+const unitValue = (value, fallback) => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+function normalizeSettings(value = {}) {
+  return {
+    count: normalizeCount(value.count),
+    sound: typeof value.sound === 'boolean' ? value.sound : true,
+    volume: unitValue(value.volume, 0.8),
+    motion: unitValue(value.motion, null),
+    language: value.language === 'en' ? 'en' : 'zh-CN',
   };
 }
 
@@ -28,12 +41,25 @@ export function load(storage = backend()) {
     try {
       const data = JSON.parse(raw);
       if (data && data.version === VERSION) {
-        base.settings = { ...base.settings, ...(data.settings || {}) };
+        base.settings = normalizeSettings(data.settings || {});
         base.history = Array.isArray(data.history) ? data.history : [];
         base.guideSeen = data.guideSeen === true;
         for (const [k, v] of Object.entries(data)) if (!(k in base)) base[k] = v;
       }
     } catch { /* corrupted: start fresh */ }
+  }
+  // Older saves contain complete Japanese problems; keep their inputs and progress.
+  const prog = base.progress;
+  if (prog && typeof prog === 'object') {
+    if (Array.isArray(prog.review)) for (const item of prog.review) {
+      if (!item || !item.problem || typeof item.problem !== 'object') continue;
+      item.problem = localizeProblem(item.problem);
+      if (typeof item.problem.title === 'string' && typeof item.problem.text === 'string') item.sig = signature(item.problem);
+    }
+    if (prog.skills && typeof prog.skills === 'object') for (const skill of Object.values(prog.skills)) {
+      if (!skill || !Array.isArray(skill.first)) continue;
+      for (const entry of skill.first) if (entry && entry.p && typeof entry.p === 'object') entry.p = localizeProblem(entry.p);
+    }
   }
   cache = base;
   return cache;
@@ -50,8 +76,8 @@ export function hasSeenGuide() { return load().guideSeen === true; }
 export function markGuideSeen() { load().guideSeen = true; save(); }
 
 export function updateSettings(patch) {
-  Object.assign(load().settings, patch);
-  save();
+  load().settings = normalizeSettings({ ...load().settings, ...patch });
+  return save();
 }
 
 // ---------------------------------------------------------------- history

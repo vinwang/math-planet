@@ -48,13 +48,13 @@ function checkAnswer(p) {
     assert.equal(Number(q), Math.floor(p.a / p.b), p.text);
     assert.equal(p.rem, p.a % p.b, p.text);
   } else {
-    const expect = p.answer.replace(/ あまり /, '').replace(/と/, '').replace('.', '');
+    const expect = p.answer.replace(/ 余 /, '').replace(/又/, '').replace('.', '');
     // Fractions are typed denominator first.
-    const fr = p.answer.match(/^(?:(\d+)と)?(\d+)\/(\d+)$/);
+    const fr = p.answer.match(/^(?:(\d+)又)?(\d+)\/(\d+)$/);
     const want = fr ? `${fr[1] || ''}${fr[3]}${fr[2]}` : expect;
     assert.equal(typed, want, `${p.skill} ${p.text} -> ${p.answer}`);
     const v = evalText(p.text);
-    if (v !== null && !p.answer.includes('あまり')) assert.ok(Math.abs(v - num(p.answer)) < 1e-9, `${p.skill} ${p.text} = ${p.answer}`);
+    if (v !== null && !p.answer.includes('余')) assert.ok(Math.abs(v - num(p.answer)) < 1e-9, `${p.skill} ${p.text} = ${p.answer}`);
   }
 }
 
@@ -63,6 +63,8 @@ test('all skills generate valid problems', () => {
   for (const s of SKILLS) {
     for (let i = 0; i < 250; i++) {
       const p = makeProblem(s.id, rng);
+      const visible = [p.title, p.text, p.answer, p.answerText, p.help, ...p.cells.map((c) => c.text), ...p.steps.flatMap((step) => [step.label, step.hint, step.help?.text])];
+      for (const text of visible) if (typeof text === 'string') assert.doesNotMatch(text, /[\u3040-\u30ff]/, `${s.id}: ${text}`);
       checkLayout(p);
       checkAnswer(p);
     }

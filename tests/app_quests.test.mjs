@@ -1,10 +1,18 @@
 // Daily quests (id035).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { QUEST, QUEST_MINUTES, dailyQuests, questMinutes, questEvent, ensureDay, allDone, claimReward, questDef } from '../app/js/quests.js';
+import { QUEST, QUESTS, QUEST_MINUTES, dailyQuests, questMinutes, questEvent, ensureDay, allDone, claimReward, questDef, questText } from '../app/js/quests.js';
+import { SKILL } from '../app/js/skills.js';
 
 const base = { count: 10, review: 3, hasNew: true, hasLearning: true, placed: true, extraOk: true, avgCells: 2.5 };
 const days = Array.from({ length: 120 }, (_, i) => { const d = new Date(2026, 0, 1 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+
+test('quest labels use Chinese and the polish quest keeps its skill name', () => {
+  for (const q of QUESTS) assert.doesNotMatch(questText(q), /[\u3040-\u30ff]/u, q.id);
+  assert.equal(questText({ id: 'extra5' }), '在加赛中完成5题');
+  assert.equal(questText({ id: 'polish', skill: 'g2-kuku25' }), `一次答对「${SKILL['g2-kuku25'].name}」3题`);
+  assert.doesNotMatch(questText({ id: 'polish', skill: 'g2-kuku25' }), /[\u3040-\u30ff]/u);
+});
 
 test('each day: two very easy quests and one harder one, fixed by the date', () => {
   const a = dailyQuests('2026-09-27', base);

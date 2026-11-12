@@ -1,5 +1,5 @@
 // Full-screen WebGL backdrop: sunburst rays that grow into a rainbow tunnel of
-// Dopakichi silhouettes. Falls back to a CSS conic gradient without WebGL.
+// stars. Falls back to a CSS conic gradient without WebGL.
 
 const VERT = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
 const FRAG = `precision highp float;
@@ -7,18 +7,18 @@ uniform vec2 uRes; uniform vec2 uCenter; uniform float uTime, uE, uKick, uFlash,
 vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h*6. + vec3(0.,4.,2.), 6.) - 3.) - 1., 0., 1.); return v * mix(vec3(1.), k, s); }
 float hash(vec2 c){ return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453); }
 mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-// Dopakichi head silhouette: a wide rounded head with large side ears.
-float dopa(vec2 p){
-  vec2 q = (p - vec2(0., -0.02)) / vec2(0.2, 0.15);
-  float h = (length(q) - 1.) * 0.15;
-  float e1 = length(p - vec2(-0.26, 0.01)) - 0.11;
-  float e2 = length(p - vec2(0.26, 0.01)) - 0.11;
-  return min(h, min(e1, e2));
+// Signed distance to a five-point star, folded into one symmetric wedge.
+float star(vec2 p){
+  float wedge = 3.14159265 / 5.;
+  float a = abs(mod(atan(p.y, p.x == 0. ? .000001 : p.x) - 1.5707963 + wedge, 2. * wedge) - wedge);
+  vec2 q = length(p) * vec2(cos(a), sin(a));
+  vec2 edge = vec2(.13 * cos(wedge) - .31, .13 * sin(wedge));
+  return -(edge.x * q.y - edge.y * (q.x - .31)) / length(edge);
 }
 // Beat rings travelling outward (shared).
 float beatRings(float r, float t, float E){ return smoothstep(.35, .7, E) * smoothstep(0.035, 0., abs(fract(r * 2.4 - t * 0.8) - .5) - .45); }
 
-// 0: sunburst rays -> rainbow -> tunnel of Dopakichi faces.
+// 0: sunburst rays -> rainbow -> tunnel of stars.
 vec3 classic(vec2 p, float r, float a, float E, float t){
   float nr = floor(mix(10., 20., clamp(E, 0., 1.)));
   float tw = sin(r * 6. - t * 1.5) * 0.25 * smoothstep(.6, 1., E);
@@ -35,10 +35,10 @@ vec3 classic(vec2 p, float r, float a, float E, float t){
   float tn = smoothstep(.82, 1.08, E);
   if (tn > 0.001) {
     vec2 uv = vec2(a / 6.2832 * 10., 0.32 / (r + .015) + t * (1.2 + .8 * max(0., E - 1.)));
-    // Stagger rows by shifting the tiling itself so each face stays centred in its tile (shifting f cut one ear at the tile edge).
+    // Stagger rows while keeping each star centred in its tile.
     uv.x += .5 * mod(floor(uv.y), 2.);
     vec2 cell = floor(uv); vec2 f = fract(uv) - .5;
-    float d = dopa(vec2(f.x, -f.y) * 1.1);
+    float d = star(vec2(f.x, -f.y) * 1.1);
     vec3 sc = hsv(fract((cell.x * .11 + cell.y * .17) + t * .25 + uHue), .7, 1.);
     float m = smoothstep(.015, -.015, d) * smoothstep(.02, .22, r);
     float ol = smoothstep(.03, 0., abs(d + .012)) * smoothstep(.02, .22, r);

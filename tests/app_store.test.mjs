@@ -23,6 +23,30 @@ test('defaults when storage is empty, corrupted, or throwing', () => {
   assert.equal(store.save(bad), false);
 });
 
+test('invalid stored settings fall back without discarding learning records', () => {
+  for (const count of [7, 0, -1, 100000, '6', null]) {
+    store.reset(null);
+    const state = store.load(memory({ 'dopa-drill:v1': JSON.stringify({
+      version: 1, settings: { count, sound: 'yes', volume: 'loud', motion: false },
+      history: [{ score: 100, day: '2026-11-11' }], progress: { placed: true, skills: {}, review: [] },
+    }) }));
+    assert.deepEqual(state.settings, { count: 10, sound: true, volume: 0.8, motion: null, language: 'zh-CN' });
+    assert.equal(state.history.length, 1);
+    assert.equal(state.progress.placed, true);
+  }
+  for (const count of [6, 10, 14]) assert.equal(store.normalizeCount(count), count);
+  assert.equal(store.normalizeCount(NaN), 10);
+});
+
+test('settings updates clamp numeric controls and reject invalid values', () => {
+  store.reset(null);
+  store.updateSettings({ count: 14, sound: false, volume: 2, motion: -1 });
+  assert.deepEqual(store.settings(), { count: 14, sound: false, volume: 1, motion: 0, language: 'zh-CN' });
+  store.updateSettings({ count: Infinity, volume: NaN, motion: null });
+  assert.deepEqual(store.settings(), { count: 10, sound: false, volume: 0.8, motion: null, language: 'zh-CN' });
+  store.reset(null);
+});
+
 test('records group by day with best score and streak', () => {
   store.reset();
   const mem = memory();
@@ -198,4 +222,20 @@ test('guideSeen remains usable for this visit when storage cannot be written', (
     store.reset(null);
     assert.equal(store.hasSeenGuide(), false);
   } finally { delete globalThis.localStorage; store.reset(null); }
+});
+
+
+test('legacy review and time capsule problems are translated without losing progress', () => {
+  store.reset(null);
+  const problem = { skill: 'g3-div-rem', title: 'あまりのあるわりざん', text: '17 ÷ 5', answer: '3 あまり 2', answerText: '17 ÷ 5 ＝ 3 あまり 2', cells: [{ kind: 'word', text: 'あまり' }], steps: [{ digit: '3' }, { digit: '2' }] };
+  const state = { version: 1, history: [{ score: 100 }], progress: { placed: true, review: [{ sig: 'old', skill: problem.skill, problem, at: 123 }], skills: { [problem.skill]: { mastered: true, first: [{ p: problem, at: 123 }] } } } };
+  const mem = memory({ 'dopa-drill:v1': JSON.stringify(state) });
+  const loaded = store.load(mem);
+  assert.equal(loaded.progress.review[0].sig, '有余数的除法|17 ÷ 5');
+  assert.equal(loaded.progress.review[0].problem.answerText, '17 ÷ 5 ＝ 3 余 2');
+  assert.equal(loaded.progress.skills[problem.skill].first[0].p.title, '有余数的除法');
+  assert.deepEqual(loaded.progress.review[0].problem.steps, problem.steps);
+  assert.equal(loaded.progress.skills[problem.skill].mastered, true);
+  assert.deepEqual(loaded.history, state.history);
+  store.reset(null);
 });

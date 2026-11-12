@@ -1,34 +1,33 @@
-// Dopakichi: a rubber-hose mascot drawn as layered SVG in screen space.
-// Shapes follow docs/dopakichi.svg, converted to unit space (feet at y=0).
+// 星仔：以星形轮廓和轨道装饰绘制的原创吉祥物。
+// The actor keeps the existing animation interface and unit space (feet at y=0).
 // Body parts are springs; actions are cancellable async routines.
 import { Spring, tween, wait, lerp, clamp, rand, pick, quadPoint, easeOutQuad, easeInQuad, easeOutBack, easeInOutCubic, easeOutCubic, onFrame } from './core.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const INK = '#000';
-const CREAM = '#fff3e4';
 export const PALETTES = {
-  pink: { body: '#ff97bf', inner: '#ffe6f0', leg: '#2f79f7', cheek: '#ffe6f0' },
-  blue: { body: '#6fa0ff', inner: '#dde8ff', leg: '#ff97bf', cheek: '#ffd6e6' },
-  yellow: { body: '#ffd452', inner: '#fff3c4', leg: '#2f79f7', cheek: '#ffd9c2' },
-  mint: { body: '#5eddb8', inner: '#d6f8ec', leg: '#7b5cff', cheek: '#ffd6e6' },
-  violet: { body: '#b793ff', inner: '#ede3ff', leg: '#ff97bf', cheek: '#ffd6e6' },
+  pink: { body: '#ff81ad', inner: '#ffe69b', leg: '#6046b7', cheek: '#ffc4ce' },
+  blue: { body: '#7abaff', inner: '#ffedaa', leg: '#5145a5', cheek: '#ffd2c7' },
+  yellow: { body: '#ffcf53', inner: '#fff1a8', leg: '#5145a5', cheek: '#ff9d92' },
+  mint: { body: '#6bdbb6', inner: '#fff1a8', leg: '#5544a9', cheek: '#ffc3b9' },
+  violet: { body: '#b99aff', inner: '#fff1a8', leg: '#5544a9', cheek: '#ffc3c9' },
   // Unlockable colours for the hero (id041, id044).
-  gold: { body: '#ffc53d', inner: '#fff1b8', leg: '#ff7ab6', cheek: '#ffd9c2' },
-  snow: { body: '#f4f6ff', inner: '#dde4ff', leg: '#3b6bff', cheek: '#ffd6e6' },
-  rainbow: { body: 'url(#dk-rainbow)', inner: '#fff4f9', leg: '#2f79f7', cheek: '#ffe6f0', flat: '#ff97bf' },
+  gold: { body: '#f8b928', inner: '#fff1a8', leg: '#6549a8', cheek: '#ffa899' },
+  snow: { body: '#f2f5ff', inner: '#fff1a8', leg: '#5751aa', cheek: '#ffbec9' },
+  rainbow: { body: 'url(#dk-rainbow)', inner: '#fff1a8', leg: '#5544a9', cheek: '#ffd0ce', flat: '#ff81ad' },
 };
 
-// Costumes drawn over the original shape (docs/dopakichi.svg is never changed).
+// Costumes are layered over the mascot.
 // head: moves with the head; back: behind the body (capes).
 export const COSTUMES = {
-  cap: { head: `<path class="dk-l" d="M-44 -133 C-44 -166 44 -166 44 -133 Z" fill="#3b6bff"/><path class="dk-l" d="M-6 -133 C10 -140 52 -142 60 -132 C52 -126 20 -126 -6 -133Z" fill="#2a4fd6"/><circle class="dk-l" cx="0" cy="-160" r="5" fill="#ffd23f"/><path d="M-30 -147 Q0 -158 30 -147" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>` },
-  hachimaki: { head: `<path class="dk-l" d="M-55 -128 Q0 -142 55 -128 L55 -116 Q0 -130 -55 -116Z" fill="#fff"/><circle cx="0" cy="-129" r="6" fill="#ff4f6d"/><path class="dk-l" d="M50 -124 Q70 -132 82 -122 Q70 -118 56 -120Z M52 -120 Q66 -110 74 -98 Q62 -104 52 -114Z" fill="#fff"/>` },
-  cape: { back: `<path class="dk-l" d="M-30 -58 C-60 -30 -64 -10 -58 4 L58 4 C64 -10 60 -30 30 -58 Z" fill="#ff4f6d"/><path d="M-50 -2 L50 -2" stroke="#ffd23f" stroke-width="5"/>`, head: `<path class="dk-l" d="M-24 -66 Q0 -58 24 -66 L20 -58 Q0 -52 -20 -58Z" fill="#ff4f6d"/><circle class="dk-l" cx="0" cy="-59" r="4.5" fill="#ffd23f"/>` },
-  crown: { head: `<path class="dk-l" d="M-32 -140 L-36 -176 L-18 -156 L0 -184 L18 -156 L36 -176 L32 -140 Z" fill="#ffd23f"/><circle class="dk-l" cx="0" cy="-160" r="5" fill="#ff4f6d"/><circle class="dk-l" cx="-22" cy="-150" r="3.5" fill="#3b6bff"/><circle class="dk-l" cx="22" cy="-150" r="3.5" fill="#3fdcb0"/>` },
-  glasses: { face: `<g class="dk-l" fill="rgba(255,255,255,.25)"><circle cx="-23.4" cy="-93.8" r="15"/><circle cx="23.4" cy="-93.8" r="15"/></g><path class="dk-l" d="M-8.4 -95 Q0 -100 8.4 -95 M-38 -97 L-48 -101 M38 -97 L48 -101" fill="none"/>` },
-  ribbon: { head: `<path class="dk-l" d="M0 -150 C-14 -176 -46 -170 -36 -150 C-30 -140 -12 -142 0 -150Z M0 -150 C14 -176 46 -170 36 -150 C30 -140 12 -142 0 -150Z" fill="#ff5a9c"/><circle class="dk-l" cx="0" cy="-151" r="7" fill="#ff7ab6"/><path d="M-28 -160 Q-20 -156 -14 -152 M28 -160 Q20 -156 14 -152" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8"/>` },
-  headphones: { head: `<path class="dk-l" d="M-60 -110 C-60 -178 60 -178 60 -110" fill="none" stroke-width="7" stroke="#1b1d4d"/><path d="M-60 -110 C-60 -178 60 -178 60 -110" fill="none" stroke="#a77bff" stroke-width="5"/><rect class="dk-l" x="-68" y="-122" width="16" height="30" rx="7" fill="#a77bff"/><rect class="dk-l" x="52" y="-122" width="16" height="30" rx="7" fill="#a77bff"/>` },
-  wizard: { head: `<path class="dk-l" d="M-52 -138 Q0 -152 52 -138 Q0 -128 -52 -138Z" fill="#5b3fd6"/><path class="dk-l" d="M-34 -141 C-20 -170 -4 -208 22 -222 C14 -200 26 -170 34 -141 Z" fill="#6f52ff"/><path class="dk-l" d="M-4 -182 L-1 -175 L6 -175 L0 -170 L3 -163 L-4 -167 L-10 -163 L-8 -170 L-14 -175 L-6 -175Z" fill="#ffd23f"/><circle class="dk-l" cx="22" cy="-222" r="5" fill="#ffd23f"/>` },
+  cap: { head: `<path class="dk-l" d="M-27 -145 Q-25 -167 0 -171 Q25 -167 27 -145 Z" fill="#3b6bff"/><path class="dk-l" d="M-7 -145 Q24 -152 39 -141 Q27 -136 -7 -141Z" fill="#2a4fd6"/><circle class="dk-l" cx="0" cy="-170" r="4" fill="#ffd23f"/>` },
+  hachimaki: { head: `<path class="dk-l" d="M-30 -134 Q0 -141 30 -134 L30 -124 Q0 -131 -30 -124Z" fill="#fff"/><circle cx="0" cy="-133" r="4" fill="#ff4f6d"/><path class="dk-l" d="M28 -131 Q46 -136 57 -126 Q46 -122 31 -126Z M29 -126 Q43 -118 47 -108 Q36 -114 29 -121Z" fill="#fff"/>` },
+  cape: { back: `<path class="dk-l" d="M-21 -73 Q-42 -66 -47 -19 L-29 -8 L0 -14 L29 -8 L47 -19 Q42 -66 21 -73Z" fill="#ed526f"/><path d="M-33 -20 L-24 -16 M33 -20 L24 -16" fill="none" stroke="#ffe69b" stroke-width="3"/>`, head: `<path class="dk-l" d="M-20 -72 Q0 -64 20 -72 L19 -64 Q0 -58 -19 -64Z" fill="#ed526f"/><path class="dk-l" d="M0 -70 L5 -65 L0 -60 L-5 -65Z" fill="#ffe69b"/>` },
+  crown: { head: `<path class="dk-l" d="M-25 -145 L-31 -161 L-15 -155 L0 -172 L15 -155 L31 -161 L25 -145Z" fill="#ffce4f"/><path class="dk-l" d="M0 -161 L4 -157 L0 -153 L-4 -157Z" fill="#875bce"/>` },
+  glasses: { face: `<circle class="dk-l" cx="0" cy="-108" r="16" fill="rgba(255,255,255,.2)"/><path class="dk-l" d="M-16 -108 L-31 -111 M16 -108 L31 -111" fill="none"/>` },
+  ribbon: { head: `<path class="dk-l" d="M0 -147 C-12 -167 -35 -165 -31 -148 C-28 -140 -11 -141 0 -147Z M0 -147 C12 -167 35 -165 31 -148 C28 -140 11 -141 0 -147Z" fill="#ff5a9c"/><circle class="dk-l" cx="0" cy="-147" r="6" fill="#ff7ab6"/>` },
+  headphones: { head: `<path d="M-51 -115 Q-50 -174 0 -178 Q50 -174 51 -115" fill="none" stroke="#5647bc" stroke-width="7" stroke-linecap="round"/><rect class="dk-l" x="-61" y="-127" width="13" height="23" rx="4" fill="#8e82ed"/><rect class="dk-l" x="48" y="-127" width="13" height="23" rx="4" fill="#8e82ed"/>` },
+  wizard: { head: `<path class="dk-l" d="M-25 -151 L2 -207 L23 -156Z" fill="#6853c7"/><path d="M-12 -165 L12 -168" fill="none" stroke="#ffe69b" stroke-width="4" stroke-linecap="round"/><path class="dk-l" d="M-43 -151 L39 -158 L44 -147 L-39 -140Z" fill="#4938a3"/><circle cx="2" cy="-188" r="3" fill="#ffe69b"/>` },
 };
 
 const el = (name, attrs = {}, parent) => {
@@ -42,11 +41,9 @@ const el = (name, attrs = {}, parent) => {
 // strokes use "dk-f", slightly heavier so faces stay readable when small.
 const L = 'class="dk-l"';
 const F = 'class="dk-f"';
-// Eye rings use a thinner line so the white ring stays visible, as in the drawing.
-const T = 'class="dk-t"';
 const EYE = {
-  open: (p) => `<circle r="11.2" fill="#fff" ${T}/><circle class="dk-t dk-iris" r="8.6" fill="${p.body}"/>`,
-  wide: (p) => `<circle r="12.4" fill="#fff" ${T}/><circle class="dk-t dk-iris" r="5" fill="${p.body}"/>`,
+  open: () => `<g class="dk-iris"><ellipse rx="10" ry="12" fill="#19234d"/><circle cx="-3" cy="-4" r="3" fill="#fff"/></g>`,
+  wide: () => `<g class="dk-iris"><ellipse rx="12" ry="14" fill="#19234d"/><circle cx="-4" cy="-5" r="3.5" fill="#fff"/></g>`,
   happy: () => `<path d="M-9 3 Q0 -10 9 3" fill="none" ${F}/>`,
   closed: () => `<path d="M-9 -1 Q0 7 9 -1" fill="none" ${F}/>`,
   x: () => `<path d="M-7 -7 L7 7 M7 -7 L-7 7" fill="none" ${F}/>`,
@@ -68,26 +65,25 @@ const MOUTH = {
   puff: `<path d="M-3 0 L3 0" fill="none" ${L}/>`,
 };
 
-// Shape constants (unit space, feet at y=0), from docs/dopakichi.svg scaled by 0.18.
+// Star-shaped space explorer; the animation uses feet-at-zero unit space.
 export const G = {
-  foot: 'M-19.3 -18.5 C-24.8 -18.5 -28.1 -16 -32.8 -11.3 C-36.7 -7.4 -38.9 -4.9 -35.8 -2.3 C-31.5 1.4 -24.1 1.1 -18.2 -2 C-12.1 -4.9 -8.5 -9.2 -12.1 -14.8 C-13.9 -17.6 -16.2 -18.5 -19.3 -18.5Z',
+  foot: 'M-24 -20 L-9 -20 L-8 -6 Q-8 -1 -13 -1 L-32 -1 Q-37 -1 -36 -6 L-33 -12 Q-30 -16 -24 -16Z',
   footPivot: { x: 18.5, y: -15.8 },
-  // Body fill reaches up under the head; the neck has no drawn seam.
-  bodyFill: 'M-37.4 -65.7 C-29.7 -61 -25.2 -54.2 -25.2 -46.8 C-25.2 -40.5 -28.8 -35.3 -28.8 -28.4 C-28.8 -18.4 -20.7 -13.5 -10.8 -13.5 L10.8 -13.5 C20.7 -13.5 28.8 -18.4 28.8 -28.4 C28.8 -35.3 25.2 -40.5 25.2 -46.8 C25.2 -54.2 29.7 -61 37.4 -65.7 L37.4 -75.2 L-37.4 -75.2Z',
-  bodyLine: 'M-37.4 -65.7 C-29.7 -61 -25.2 -54.2 -25.2 -46.8 C-25.2 -40.5 -28.8 -35.3 -28.8 -28.4 C-28.8 -18.4 -20.7 -13.5 -10.8 -13.5 L10.8 -13.5 C20.7 -13.5 28.8 -18.4 28.8 -28.4 C28.8 -35.3 25.2 -40.5 25.2 -46.8 C25.2 -54.2 29.7 -61 37.4 -65.7',
-  belly: { cy: -32, rx: 17.8, ry: 13.5 },
-  headFill: 'M-37.4 -65.7 C-49.7 -73.1 -56.3 -82.1 -56.3 -98.5 C-56.3 -129.6 -32.9 -149.2 0 -149.2 C32.9 -149.2 56.3 -129.6 56.3 -98.5 C56.3 -82.1 49.7 -73.1 37.4 -65.7 L0 -70.2Z',
-  headLine: 'M-37.4 -65.7 C-49.7 -73.1 -56.3 -82.1 -56.3 -98.5 C-56.3 -129.6 -32.9 -149.2 0 -149.2 C32.9 -149.2 56.3 -129.6 56.3 -98.5 C56.3 -82.1 49.7 -73.1 37.4 -65.7',
-  face: 'M0 -133 C29.7 -133 48.2 -121.7 48.2 -96.5 C48.2 -71.3 25.7 -61.2 0 -61.2 C-25.7 -61.2 -48.2 -71.3 -48.2 -96.5 C-48.2 -121.7 -29.7 -133 0 -133Z',
-  head: { cy: -100, r: 56 },
-  neckY: -65.7,
-  ear: { x: 74.2, cy: -105.3, rx: 31, ry: 31.3, irx: 21.1, iry: 22, pivot: 52.6 },
-  eye: { x: 23.4, y: -93.8 },
-  brow: { x: 13.5, y: -111.2, rx: 3.1, ry: 1.8 },
-  mouthY: -79,
-  cheek: { x: 30.6, y: -78.5, rx: 4.3, ry: 2.7 },
-  shoulder: { x: 25.7, y: -48 },
-  rest: { x: 37.8, y: -34.7 },
+  bodyFill: 'M-22 -80 Q-29 -62 -25 -29 Q-24 -14 -13 -14 L13 -14 Q24 -14 25 -29 Q29 -62 22 -80Z',
+  bodyLine: 'M-22 -80 Q-29 -62 -25 -29 Q-24 -14 -13 -14 L13 -14 Q24 -14 25 -29 Q29 -62 22 -80Z',
+  belly: { cy: -42, rx: 8, ry: 8 },
+  headFill: 'M0 -158 L14 -128 L51 -126 L25 -103 L34 -68 L0 -85 L-34 -68 L-25 -103 L-51 -126 L-14 -128Z',
+  headLine: 'M0 -158 L14 -128 L51 -126 L25 -103 L34 -68 L0 -85 L-34 -68 L-25 -103 L-51 -126 L-14 -128Z',
+  face: '',
+  head: { cy: -108, r: 52 },
+  neckY: -75,
+  ear: { x: 72, cy: -110, rx: 8, ry: 7, irx: 3, iry: 3, pivot: 45 },
+  eye: { x: 0, y: -108 },
+  brow: { x: 0, y: -124, rx: 4, ry: 1.8 },
+  mouthY: -90,
+  cheek: { x: 24, y: -94, rx: 4, ry: 2.5 },
+  shoulder: { x: 23, y: -54 },
+  rest: { x: 37, y: -35 },
   arm: 4.6,
   hand: 9.7,
 };
@@ -96,11 +92,12 @@ export const G = {
 const lineFor = (S) => clamp(1.7 / S, 1.4, 3.2);
 
 // Static parts shared by the live actor and the sprite image.
-const earSVG = (p, s) => `<ellipse ${L} cx="${s * G.ear.x}" cy="${G.ear.cy}" rx="${G.ear.rx}" ry="${G.ear.ry}" fill="${p.body}"/><ellipse ${L} cx="${s * G.ear.x}" cy="${G.ear.cy}" rx="${G.ear.irx}" ry="${G.ear.iry}" fill="${p.inner}"/>`;
+const earSVG = (p, s) => `<g transform="scale(${s} 1)"><path ${L} d="M43 -113 Q61 -111 69 -101" fill="none"/><path ${L} d="M72 -108 L75 -103 L80 -101 L75 -99 L72 -94 L69 -99 L64 -101 L69 -103Z" fill="${p.inner}"/></g>`;
 const footSVG = (p, s) => `<path ${L} d="${G.foot}" fill="${p.leg}"${s > 0 ? ' transform="scale(-1 1)"' : ''}/>`;
-const bodySVG = (p) => `<path d="${G.bodyFill}" fill="${p.body}"/><path ${L} d="${G.bodyLine}" fill="none"/><ellipse ${L} cy="${G.belly.cy}" rx="${G.belly.rx}" ry="${G.belly.ry}" fill="${CREAM}"/>`;
-const headSVG = (p) => `<path d="${G.headFill}" fill="${p.body}"/><path ${L} d="${G.headLine}" fill="none"/><path ${L} d="${G.face}" fill="${CREAM}"/>`;
+const bodySVG = (p) => `<path ${L} d="${G.bodyFill}" fill="${p.leg}"/><path d="M0 -54 L3 -47 L10 -45 L4 -40 L5 -33 L0 -36 L-5 -33 L-4 -40 L-10 -45 L-3 -47Z" fill="${p.inner}"/>`;
+const headSVG = (p) => `<path ${L} d="${G.headFill}" fill="${p.body}"/>`;
 const STYLE = `.dk-l,.dk-f,.dk-t{stroke:${INK};stroke-linecap:round;stroke-linejoin:round}.dk-l{stroke-width:var(--dkw)}.dk-f{stroke-width:calc(var(--dkw) * 1.5)}.dk-t{stroke-width:calc(var(--dkw) * 0.55)}`;
+const RAINBOW = '<linearGradient id="dk-rainbow" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ff81ad"/><stop offset=".33" stop-color="#ffcf53"/><stop offset=".66" stop-color="#6bdbb6"/><stop offset="1" stop-color="#7abaff"/></linearGradient>';
 
 let uid = 0;
 
@@ -109,7 +106,7 @@ export class Dopakichi {
     this.layer = layer;
     this.S = scale;
     this.lw = lineFor(scale);
-    this.pal = PALETTES[palette];
+    this.pal = PALETTES[palette] || PALETTES.pink;
     this.id = uid++;
     this.x = 0; this.y = 0;
     this.home = { x: 0, y: 0 };
@@ -156,8 +153,8 @@ export class Dopakichi {
     el('g', {}, this.headG).innerHTML = headSVG(p);
     this.face = el('g', {}, this.headG);
     this.cheeks = [-1, 1].map((s) => el('ellipse', { cx: s * G.cheek.x, cy: G.cheek.y, rx: G.cheek.rx, ry: G.cheek.ry, fill: p.cheek }, this.face));
-    this.brows = [-1, 1].map(() => el('ellipse', { class: 'dk-l', rx: G.brow.rx, ry: G.brow.ry, fill: p.body }, this.face));
-    this.eyeGs = [-1, 1].map(() => el('g', {}, this.face));
+    this.brows = [el('ellipse', { class: 'dk-l', rx: G.brow.rx, ry: G.brow.ry, fill: INK }, this.face)];
+    this.eyeGs = [el('g', {}, this.face)];
     this.irises = [];
     this.mouthG = el('g', { transform: `translate(0 ${G.mouthY})` }, this.face);
     this.sweat = el('path', { d: 'M0 -12 Q6 -2 0 2 Q-6 -2 0 -12Z', fill: '#8fd3ff', class: 'dk-l', opacity: 0 }, this.face);
@@ -176,7 +173,7 @@ export class Dopakichi {
     if (!document.getElementById('dk-style')) el('style', { id: 'dk-style' }, svg).textContent = STYLE;
     if (!document.getElementById('dk-rainbow')) {
       const defs = el('defs', {}, svg);
-      defs.innerHTML = '<linearGradient id="dk-rainbow" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ff97bf"/><stop offset=".33" stop-color="#ffd452"/><stop offset=".66" stop-color="#5eddb8"/><stop offset="1" stop-color="#8fb4ff"/></linearGradient>';
+      defs.innerHTML = RAINBOW;
     }
     this.eyes = null; this.mouth = null;
     this.setFace(this.baseEyes || 'open', this.baseMouth || 'smile', true);
@@ -204,10 +201,9 @@ export class Dopakichi {
   setFace(eyes, mouth, base = false) {
     if (eyes && eyes !== this.eyes) {
       this.eyes = eyes;
-      this.eyeGs.forEach((g, i) => {
-        const kind = eyes === 'wink' ? (i ? 'happy' : 'open') : eyes;
-        // The right eye mirrors so pointed shapes face each other.
-        g.innerHTML = `<g transform="scale(${i && kind === 'tight' ? -1 : 1} 1)">${EYE[kind](this.pal)}</g>`;
+      this.eyeGs.forEach((g) => {
+        const kind = eyes === 'wink' ? 'happy' : eyes;
+        g.innerHTML = EYE[kind](this.pal);
       });
       this.irises = this.eyeGs.map((g) => g.querySelector('.dk-iris'));
       const [lift, tilt] = BROW[eyes === 'wink' ? 'happy' : eyes] || [0, 0];
@@ -274,7 +270,7 @@ export class Dopakichi {
       const s = i ? 1 : -1;
       g.setAttribute('transform', `translate(${s * G.eye.x + lx} ${G.eye.y + ly}) scale(1 ${blink})`);
     });
-    // Irises roll inside the white ring toward the look target.
+    // The eye and its highlight follow the look target together.
     this.irises.forEach((ir) => { if (ir) ir.setAttribute('transform', `translate(${this.look.x * 2.2} ${this.look.y * 2})`); });
     this.brows.forEach((b, i) => {
       const s = i ? 1 : -1;
@@ -602,34 +598,37 @@ export class Dopakichi {
   destroy() { this.root.remove(); this.armsFront.remove(); }
 }
 
-// Standalone sprite image of Dopakichi for canvas particles (cheering pose).
+// Standalone mascot sprite for canvas particles (cheering pose).
 export function dopakichiSprite(palette = 'pink', size = 128) {
-  const p = PALETTES[palette];
+  const p = PALETTES[palette] || PALETTES.pink;
   const { eye, cheek, shoulder, brow } = G;
+  const armCol = p.flat || p.body;
   const tip = (s) => ({ x: s * 66, y: -150 });
   const arm = (s) => `M${s * shoulder.x} ${shoulder.y} Q${s * 62} ${shoulder.y - 20} ${tip(s).x} ${tip(s).y}`;
-  const svg = `<svg xmlns="${NS}" viewBox="-110 -170 220 176" width="${size}" height="${size * 176 / 220}">
+  const svg = `<svg xmlns="${NS}" viewBox="-110 -170 220 176" width="${size}" height="${size * 176 / 220}">${p.flat ? `<defs>${RAINBOW}</defs>` : ''}
   <style>svg{--dkw:3.4}${STYLE}</style>
   ${footSVG(p, -1)}${footSVG(p, 1)}${bodySVG(p)}${earSVG(p, -1)}${earSVG(p, 1)}${headSVG(p)}
-  ${[-1, 1].map((s) => `<ellipse cx="${s * cheek.x}" cy="${cheek.y}" rx="${cheek.rx}" ry="${cheek.ry}" fill="${p.cheek}"/><ellipse class="dk-l" cx="${s * brow.x}" cy="${brow.y - 4}" rx="${brow.rx}" ry="${brow.ry}" fill="${p.body}"/><g transform="translate(${s * eye.x} ${eye.y})">${EYE.happy()}</g>`).join('')}
+  ${[-1, 1].map((s) => `<ellipse cx="${s * cheek.x}" cy="${cheek.y}" rx="${cheek.rx}" ry="${cheek.ry}" fill="${p.cheek}"/>`).join('')}
+  <ellipse class="dk-l" cx="${brow.x}" cy="${brow.y - 4}" rx="${brow.rx}" ry="${brow.ry}" fill="${INK}"/><g transform="translate(${eye.x} ${eye.y})">${EYE.happy()}</g>
   <g transform="translate(0 ${G.mouthY})">${MOUTH.grin}</g>
-  ${[-1, 1].map((s) => `<path d="${arm(s)}" fill="none" stroke="${INK}" stroke-width="${G.arm + 6.8}" stroke-linecap="round"/><path d="${arm(s)}" fill="none" stroke="${p.body}" stroke-width="${G.arm}" stroke-linecap="round"/><circle class="dk-l" cx="${tip(s).x}" cy="${tip(s).y}" r="${G.hand}" fill="${p.body}"/>`).join('')}
+  ${[-1, 1].map((s) => `<path d="${arm(s)}" fill="none" stroke="${INK}" stroke-width="${G.arm + 6.8}" stroke-linecap="round"/><path d="${arm(s)}" fill="none" stroke="${armCol}" stroke-width="${G.arm}" stroke-linecap="round"/><circle class="dk-l" cx="${tip(s).x}" cy="${tip(s).y}" r="${G.hand}" fill="${armCol}"/>`).join('')}
   </svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   return img;
 }
 
-// Static SVG markup of Dopakichi with a colour and costume (collection thumbnails).
+// Static mascot SVG with a colour and costume (collection thumbnails).
 export function dopakichiSVG(palette = 'pink', costume = null) {
   const p = PALETTES[palette] || PALETTES.pink;
   const c = (costume && COSTUMES[costume]) || {};
   const { eye, cheek, brow } = G;
   const armCol = p.flat || p.body;
-  const rb = p.body.startsWith('url(') ? '<defs><linearGradient id="dk-rainbow" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ff97bf"/><stop offset=".33" stop-color="#ffd452"/><stop offset=".66" stop-color="#5eddb8"/><stop offset="1" stop-color="#8fb4ff"/></linearGradient></defs>' : '';
+  const rb = p.flat ? `<defs>${RAINBOW}</defs>` : '';
   return `<svg xmlns="${NS}" viewBox="-112 -232 224 240" aria-hidden="true">${rb}<style>svg{--dkw:3.4}${STYLE}</style>
   ${c.back || ''}${footSVG(p, -1)}${footSVG(p, 1)}${bodySVG(p)}${earSVG(p, -1)}${earSVG(p, 1)}${headSVG(p)}
-  ${[-1, 1].map((s) => `<ellipse cx="${s * cheek.x}" cy="${cheek.y}" rx="${cheek.rx}" ry="${cheek.ry}" fill="${p.cheek}"/><ellipse class="dk-l" cx="${s * brow.x}" cy="${brow.y}" rx="${brow.rx}" ry="${brow.ry}" fill="${armCol}"/><g transform="translate(${s * eye.x} ${eye.y})">${EYE.open(p.body.startsWith('url(') ? { body: armCol } : p)}</g>`).join('')}
+  ${[-1, 1].map((s) => `<ellipse cx="${s * cheek.x}" cy="${cheek.y}" rx="${cheek.rx}" ry="${cheek.ry}" fill="${p.cheek}"/>`).join('')}
+  <ellipse class="dk-l" cx="${brow.x}" cy="${brow.y}" rx="${brow.rx}" ry="${brow.ry}" fill="${INK}"/><g transform="translate(${eye.x} ${eye.y})">${EYE.open()}</g>
   <g transform="translate(0 ${G.mouthY})">${MOUTH.smile}</g>
   ${[-1, 1].map((s) => `<circle class="dk-l" cx="${s * G.rest.x}" cy="${G.rest.y}" r="${G.hand}" fill="${armCol}"/>`).join('')}
   ${c.face || ''}${c.head || ''}</svg>`;

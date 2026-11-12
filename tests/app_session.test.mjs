@@ -33,18 +33,32 @@ test('grade plans stay inside the grade for basic problems', () => {
   }
 });
 
-test('placement walks forward on clean answers and grants ancestors', () => {
+test('placement recommends a starting skill without granting mastery or stars', () => {
   const prog = emptyProgress();
   const plan = placementPlan(prog, 10);
   const asked = [];
-  for (let i = 0; i < 8; i++) { const id = plan.pick(); asked.push(id); plan.answer(true); }
-  const mastered = SKILLS.filter((x) => isMastered(prog, x.id)).length;
-  assert.ok(mastered >= 20, `mastered ${mastered} after 8 clean answers (at ${asked[7]})`);
-  for (const r of SKILL[asked[6]].req) assert.ok(isMastered(prog, r));
-  // A slip eases back.
+  for (let i = 0; i < 8; i++) {
+    const id = plan.pick(); asked.push(id);
+    plan.answer(true);
+    recordResult(prog, id, true);
+  }
+  assert.equal(SKILLS.filter((skill) => isMastered(prog, skill.id)).length, 0);
+  assert.equal(prog.placementSkill, asked.at(-1));
+  assert.equal(stateOf(prog, prog.placementSkill), 'locked');
+  assert.ok(SKILL[prog.placementSkill].req.some((id) => !isMastered(prog, id)));
   const p0 = plan.walk.p;
   plan.answer(false);
   assert.ok(plan.walk.p <= p0);
+  prog.placed = true;
+  assert.ok(isUnlocked(prog, prog.placementSkill));
+  assert.ok(levelPlan(prog, 10, makeRng(5)).basic.includes(prog.placementSkill));
+  const recommended = prog.placementSkill;
+  assert.ok(!isMastered(prog, recommended));
+  for (let i = 0; i < 6; i++) recordResult(prog, recommended, true);
+  assert.ok(isMastered(prog, recommended));
+  for (const id of SKILL[recommended].req) assert.ok(!isMastered(prog, id));
+  relockSkill(prog, recommended);
+  assert.equal(prog.placementSkill, undefined);
 });
 
 test('level plan mixes review and frontier, problems avoid recent repeats', () => {
@@ -60,6 +74,34 @@ test('level plan mixes review and frontier, problems avoid recent repeats', () =
   for (let i = 0; i < 8; i++) { const p = problemFor(prog, 'g1-add-c', rng); sigs.push(`${p.text}`); recordResult(prog, 'g1-add-c', true, `${p.title}|${p.text}`); }
   assert.equal(new Set(sigs).size, sigs.length);
   assert.ok(SKILLS.length === ORDER.length);
+});
+
+test('a 14-question placement samples distinct skills without manufacturing mastery', () => {
+  for (const clean of [true, false]) {
+    const prog = emptyProgress();
+    const plan = placementPlan(prog, 14);
+    const asked = [];
+    for (let i = 0; i < 14; i++) {
+      const id = plan.pick();
+      asked.push(id);
+      plan.answer(clean);
+      recordResult(prog, id, clean);
+    }
+    assert.equal(new Set(asked).size, clean ? 14 : 1);
+    if (!clean) assert.equal(prog.placementSkill, asked[0], 'all misses keep the beginner at the starting skill');
+    assert.equal(Object.values(prog.skills).some((s) => s.mastered), false);
+  }
+});
+
+test('placement can retest a lower skill after repeated misses', () => {
+  const prog = emptyProgress();
+  const plan = placementPlan(prog, 14);
+  const positions = [];
+  for (const clean of [true, false, false, false, false, false]) {
+    positions.push(PLACEMENT.indexOf(plan.pick()));
+    plan.answer(clean);
+  }
+  for (let i = 2; i < positions.length; i++) assert.ok(positions[i] <= positions[i - 1]);
 });
 
 test('relocking a skill erases it and everything built on it (id031)', () => {
@@ -158,7 +200,7 @@ test('stars: 1 at mastery, then accuracy, speed, retention and mastery of speed;
   // Star 4 needs a gap of a week, then three clean answers.
   for (let i = 0; i < 3; i++) answer(true, ok);
   assert.equal(starsOf(prog, id), 3);
-  assert.match(nextStar(prog, id, '2026-10-03').now, /あと 5日/);
+  assert.match(nextStar(prog, id, '2026-10-03').now, /还要等5天/);
   day = 9;
   for (let i = 0; i < 3; i++) answer(true, ok);
   assert.equal(starsOf(prog, id), 4);

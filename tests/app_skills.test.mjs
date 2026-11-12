@@ -18,3 +18,16 @@ test('every grade and lane is populated', () => {
   LANES.forEach((_, i) => assert.ok(SKILLS.some((s) => s.lane === i), `lane ${i}`));
   assert.ok(SKILLS.length >= 50);
 });
+
+
+test('curriculum grades match the intended mainland learning sequence', () => {
+  const grades = {
+    'g3-div-basic': 2, 'g3-div-rem': 2,
+    'g4-vdiv-2d1': 3, 'g4-vdiv-3d1': 3,
+    'g3-vmul-2x2': 3, 'g3-vmul-3x2': 4,
+    'g4-dec-mul': 5, 'g4-dec-div': 5, 'g5-dec-mul': 5, 'g5-dec-div': 5,
+    'g6-letter': 5, 'g5-percent': 6, 'g5-frac-int': 6, 'g6-frac-mul': 6, 'g6-frac-div': 6,
+  };
+  for (const [id, grade] of Object.entries(grades)) assert.equal(SKILL[id].grade, grade, id);
+  for (const skill of SKILLS) assert.doesNotMatch(skill.name, /[\u3040-\u30ff]/, skill.id);
+});
